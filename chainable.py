@@ -24,6 +24,7 @@ from typing import (
     Optional,
     ParamSpec,
     Protocol,
+    Self,
     TypeVar,
     cast,
     no_type_check,
@@ -119,62 +120,67 @@ class ChainableIterator(Iterator[T]):
         """
         return ChainableIterator(map(func, self))
 
-    def filter(
-        self, func: Callable[[T], bool], filter_false: bool = False
-    ) -> ChainableIterator[T]:
+    def filter(self, func: Callable[[T], bool], filter_false: bool = False) -> Self:
         """
         ChainableIterator(range(5)).filter(lambda x: x%2 == 0)
         -> 0 2 4
         """
         if filter_false:
-            return ChainableIterator(filterfalse(func, self))
-        return ChainableIterator(filter(func, self))
+            self._iterable = filterfalse(func, self)
+        self._iterable = filter(func, self)
+        return self
 
     def accumulate(
         self, func: Callable[[T, T], T], *, initial: object | T = NA
-    ) -> ChainableIterator[T]:
+    ) -> Self:
         """
         ChainableIterator(range(5)).accumulate(add)
         -> 0 1 3 6 10
         """
         if initial is NA:
-            return ChainableIterator(accumulate(self, func))
-        return ChainableIterator(accumulate(self, func, initial=cast(T, NA)))
+            self._iterable = accumulate(self, func)
+        self._iterable = accumulate(self, func, initial=cast(T, NA))
+        return self
 
-    def append(self, *iterable: Iterable[T]) -> ChainableIterator[T]:
+    def append(self, *iterable: Iterable[T]) -> Self:
         """
         ChainableIterator(range(5)).append(range(5, 10))
         -> 0 1 2 3 4 5 6 7 8 9
         """
-        return ChainableIterator(chain(self, *iterable))
+        self._iterable = chain(self, *iterable)
+        return self
 
-    def prepend(self, *iterable: Iterable[T]) -> ChainableIterator[T]:
+    def prepend(self, *iterable: Iterable[T]) -> Self:
         """
         ChainableIterator(range(5)).append(range(5, 10))
         -> 5 6 7 8 9 0 1 2 3 4
         """
-        return ChainableIterator(chain(*iterable, self))
+        self._iterable = chain(*iterable, self)
+        return self
 
-    def compress(self, selectors: Iterable[bool]) -> ChainableIterator[T]:
+    def compress(self, selectors: Iterable[bool]) -> Self:
         """
         ChainableIterator(range(5)).compress([1, 0, 0, 1, 0])
         -> 0 3
         """
-        return ChainableIterator(compress(self, selectors))
+        self._iterable = compress(self, selectors)
+        return self
 
-    def dropwhile(self, predicate: Callable[[T], bool]) -> ChainableIterator[T]:
+    def dropwhile(self, predicate: Callable[[T], bool]) -> Self:
         """
         ChainableIterator(range(5)).dropwhile(lambda x: x < 3)
         -> 3 4
         """
-        return ChainableIterator(dropwhile(predicate, self))
+        self._iterable = dropwhile(predicate, self)
+        return self
 
-    def takewhile(self, predicate: Callable[[T], bool]) -> ChainableIterator[T]:
+    def takewhile(self, predicate: Callable[[T], bool]) -> Self:
         """
         ChainableIterator(range(5)).takewhile(lambda x: x < 3)
         -> 0 1 2
         """
-        return ChainableIterator(takewhile(predicate, self))
+        self._iterable = takewhile(predicate, self)
+        return self
 
     @overload
     def zip2(
@@ -361,23 +367,23 @@ class ChainableIterator(Iterator[T]):
 
         return ChainableIterator(_helper())
 
-    def islice(
-        self, start: int | None, stop: int | None, step: int | None = 1
-    ) -> ChainableIterator[T]:
+    def islice(self, start: int | None, stop: int | None, step: int | None = 1) -> Self:
         """
         ChainableIterator(range(50)).islice(0, 10, 10)
         -> 0 10 20 30 40
         """
         if start is None:
             raise ValueError("At least one of start and stop must be not None.")
-        return ChainableIterator(islice(self, start, stop, step))
+        self._iterable = islice(self, start, stop, step)
+        return self
 
-    def skip(self, n: int | None = None) -> ChainableIterator[T]:
+    def skip(self, n: int | None = None) -> Self:
         """
         ChainableIterator(range(50)).skip(45)
         -> 45 46 47 48 49
         """
-        return ChainableIterator(islice(self, n, None))
+        self._iterable = islice(self, n, None)
+        return self
 
     def getitems(self, indices: Iterable[int]) -> ChainableIterator[T]:
         """
@@ -385,7 +391,7 @@ class ChainableIterator(Iterator[T]):
         -> 12 15
         """
 
-        def _helper() -> Iterable[T]:
+        def _helper() -> Iterator[T]:
             it = iter(indices)
             ix = next(it)
             for i, item in enumerate(self):
@@ -396,7 +402,8 @@ class ChainableIterator(Iterator[T]):
                         break
                     ix = cast(int, temp)
 
-        return ChainableIterator(_helper())
+        self._iterable = _helper()
+        return self
 
     def starmap(self, func: Callable[P, R], *args: Iterable) -> ChainableIterator[R]:
         if len(args) == 0:
@@ -431,7 +438,18 @@ class ChainableIterator(Iterator[T]):
         transposed = zip(*its)
         return ChainableIterator(transposed)
 
-    def __gt__(self, func: Callable[[ChainableIterator[T]], R]) -> R:
+    def __gt__(self, func: Callable[[ChainableIterator[Any]], R]) -> R:
+        return func(self)
+
+    def consume_with(self, func: Callable[[T], Any]) -> None:
+        r"""For each item, apply the given function.
+
+        NOTE: This collapses the Iterable and Chainable status.
+        """
+        for item in self:
+            func(item)
+
+    def feed_to(self, func: Callable[[Any], R]) -> R:
         return func(self)
 
 
@@ -472,5 +490,7 @@ if __name__ == "__main__":
         "Nov",
         "Dec",
     ]
-    month_dict = ChainableIterator(months).enumerate(start=1).map(reversed) > dict
+    month_dict = (
+        ChainableIterator(months).enumerate(start=1).map(reversed).feed_to(dict)
+    )
     print(month_dict)
