@@ -7,6 +7,26 @@ $ pip install "git+https://github.com/sayandipdutta/chainable_iter"
 
 This module provides a convenient way to chain useful methods on an iterator.
 
+## Example:
+```python
+from chainable_iter import ChainableIterator
+
+ch_iter = ChainableIterator(range(10))
+
+result = (
+  ch_iter
+    .skip(1)
+    .map(lambda x: x**2)  # 1 4 9 16 25 36 49 64 81
+    .takewhile(lambda x: x < 10)  # 1 4 9
+    .getitems([0, 2]) # 1 9
+    .make_collapsible() # it can no longer be used as a ChainableIterator
+    .collapse(sum) # 10
+)
+
+print(result)
+# 10
+```
+
 ## Iterator Types:
 - ChainableIterator
 - NestedIterator
@@ -51,22 +71,3 @@ This module provides two types, that consume an iterator.
   Collapsible class has a single method, named collapse, that collapses the iterator
   to a single item, by applying the provided function as it's argument.
 
-## Example:
-```python
-from chainable import ChainableIterator
-
-ch_iter = ChainableIterator(range(10))
-
-result = (
-  ch_iter
-    .skip(1)
-    .map(lambda x: x**2)  # 1 4 9 16 25 36 49 64 81
-    .takewhile(lambda x: x < 10)  # 1 4 9
-    .getitems([0, 2]) # 1 9
-    .make_collapsible() # it can no longer be used as a ChainableIterator
-    .collapse(sum) # 10
-)
-
-print(result)
-# 10
-```
