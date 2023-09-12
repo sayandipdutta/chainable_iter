@@ -1,5 +1,10 @@
 # Chainable Iterator
 
+## Install instructions:
+```shell
+$ pip install "git+https://github.com/sayandipdutta/chainable_iter"
+```
+
 This module provides a convenient way to chain useful methods on an iterator.
 
 ## Iterator Types:
