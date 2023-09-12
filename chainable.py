@@ -566,9 +566,6 @@ class NestedIterator(ChainableIterator[Sequence[T]]):
     def last_of_each(self) -> Chainable[T]:
         return ChainableIterator((item[-1] for item in self))
 
-    def for_each(self, function: Callable[[Sequence[T]], R]) -> ChainableIterator[R]:
-        return ChainableIterator(map(function, self))
-
     def transpose(self) -> Self:
         its = (iter(item) for item in self)
         transposed = zip(*its)
@@ -617,7 +614,7 @@ if __name__ == "__main__":
     total = iter_values.batched(10).map(mean).map(bool).make_collapsible() >> sum
     print(total)
     iter_range = ChainableIterator(range(100))
-    iter_range.islice(20, None, 25).make_consumable().consume(print)
+    iter_range.islice(start=20, stop=None, step=25).make_consumable().consume(print)
     iter_range = ChainableIterator(range(15))
     iter_range.split_at(3, 5, 9, 12).make_consumable().consume(print)
     iter_range.batched(5).transpose().make_consumable().consume(print)
@@ -637,6 +634,10 @@ if __name__ == "__main__":
         "Dec",
     ]
     month_dict = (
-        ChainableIterator(months).enumerate(start=1).map(reversed).feed_to(dict)
+        ChainableIterator(months)
+        .enumerate(start=1)
+        .map(reversed)
+        .make_collapsible()
+        .collapse(dict)
     )
     print(month_dict)
