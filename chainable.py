@@ -331,6 +331,7 @@ class ChainableIterator(Chainable[T]):
         self._iterable = takewhile(predicate, self)
         return self
 
+    # TODO: Try to retain type information inside the tuple
     def zip2(
         self,
         iterable: Iterable[R],
@@ -397,7 +398,7 @@ class ChainableIterator(Chainable[T]):
 
         return ChainableIterator(_helper(filter_false))
 
-    def sliding_window(self, n: int = 2, step: int = 0) -> NestedIterator[T]:
+    def sliding_window(self, n: int = 2, step: int = 1) -> NestedIterator[T]:
         """
         ChainableIterator(range(5)).sliding_window(2)
         -> (5, 6) (6, 7) (7, 8) (8, 9)
@@ -411,11 +412,13 @@ class ChainableIterator(Chainable[T]):
             window = deque(islice(self, n), maxlen=n)
             if len(window) == n:
                 yield tuple(window)
-            self.skip(step)
+            step_counter = 0
             for item in self:
                 window.append(item)
-                yield tuple(window)
-                self.skip(step)
+                step_counter += 1
+                if step_counter == step:
+                    yield tuple(window)
+                    step_counter = 0
 
         return NestedIterator(_helper())
 
