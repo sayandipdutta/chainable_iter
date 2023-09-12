@@ -1,8 +1,9 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
 
 from collections import deque
-from collections.abc import Callable, Iterable
-from functools import partial, wraps
+from collections.abc import Callable, Iterable, Sequence
+from functools import partial
 from itertools import (
     accumulate,
     chain,
@@ -16,9 +17,10 @@ from itertools import (
 )
 from operator import neg, sub
 from random import randrange
+from statistics import mean
 from typing import (
     Any,
-    Concatenate,
+    Generic,
     Iterator,
     Literal,
     Optional,
@@ -27,7 +29,6 @@ from typing import (
     Self,
     TypeVar,
     cast,
-    no_type_check,
     overload,
 )
 
@@ -49,8 +50,6 @@ T = TypeVar("T")
 R = TypeVar("R")
 K = TypeVar("K")
 P = ParamSpec("P")
-A = TypeVar("A", bound=SupportsAdd)
-S = TypeVar("S", bound=SupportsSum)
 
 
 class Sentinel(object):
@@ -60,50 +59,198 @@ class Sentinel(object):
 NA = Sentinel()
 
 
-def for_each(
-    chainable: ChainableIterator[T],
-    func: Callable[Concatenate[T, P], Any],
-    *args: P.args,
-    **kwargs: P.kwargs,
-) -> None:
-    for item in chainable:
-        func(item, *args, **kwargs)
+class Chainable(ABC, Iterator[T]):
+    @abstractmethod
+    def map(self, func: Callable[[T], R]) -> Chainable[R]:
+        ...
+
+    @abstractmethod
+    def filter(self, func: Callable[[T], bool], filter_false: bool = False) -> Self:
+        ...
+
+    @abstractmethod
+    def accumulate(
+        self, func: Callable[[T, T], T], *, initial: object | T = NA
+    ) -> Self:
+        ...
+
+    @abstractmethod
+    def append(self, *iterable: Iterable[T]) -> Self:
+        ...
+
+    @abstractmethod
+    def prepend(self, *iterable: Iterable[T]) -> Self:
+        ...
+
+    @abstractmethod
+    def compress(self, selectors: Iterable[bool]) -> Self:
+        ...
+
+    @abstractmethod
+    def dropwhile(self, predicate: Callable[[T], bool]) -> Self:
+        ...
+
+    @abstractmethod
+    def takewhile(self, predicate: Callable[[T], bool]) -> Self:
+        ...
+
+    @abstractmethod
+    @overload
+    def zip2(
+        self,
+        iterable: Iterable[R],
+        *,
+        policy: Literal["strict", "shortest"] = "shortest",
+        other_first: Literal[False] = False,
+    ) -> Chainable[tuple[T, R]]:
+        ...
+
+    @abstractmethod
+    @overload
+    def zip2(
+        self,
+        iterable: Iterable[R],
+        *,
+        policy: Literal["strict", "shortest"] = "shortest",
+        other_first: Literal[True] = True,
+    ) -> Chainable[tuple[R, T]]:
+        ...
+
+    @abstractmethod
+    @overload
+    def zip2(
+        self,
+        iterable: Iterable[R],
+        *,
+        policy: Literal["longest"],
+        fillvalue: K,
+        other_first: Literal[False] = False,
+    ) -> Chainable[tuple[T | K, R | K]]:
+        ...
+
+    @abstractmethod
+    @overload
+    def zip2(
+        self,
+        iterable: Iterable[R],
+        *,
+        policy: Literal["longest"],
+        fillvalue: K,
+        other_first: Literal[True] = True,
+    ) -> Chainable[tuple[R | K, T | K]]:
+        ...
+
+    @abstractmethod
+    def zip2(
+        self,
+        iterable: Iterable[R],
+        *,
+        policy: Literal["strict", "shortest", "longest"] = "shortest",
+        fillvalue: Optional[K] = None,
+        other_first: bool = False,
+    ) -> (
+        Chainable[tuple[T, R]]
+        | Chainable[tuple[R, T]]
+        | Chainable[tuple[R | K, T | K]]
+        | Chainable[tuple[T | K, R | K]]
+    ):
+        ...
+
+    @abstractmethod
+    def zip(
+        self,
+        iterable: Iterable,
+        *its: Iterable,
+        policy: Literal["strict", "shortest", "longest"] = "shortest",
+        fillvalue: Any = None,
+    ) -> NestedIterator[Any]:
+        ...
+
+    @abstractmethod
+    def filter_index(
+        self, predicate: Callable[[T], bool], filter_false: bool = False
+    ) -> Chainable[int]:
+        """
+        Chainable(range(5, 10)).filter_index(lambda x: x % 3 == 0)
+        -> 1 4
+        """
+        ...
+
+    # TODO: make Nested
+    @abstractmethod
+    def sliding_window(self, n: int = 2, step: int = 0) -> Chainable[tuple[T, ...]]:
+        ...
+
+    # TODO: make Nested
+    @abstractmethod
+    @overload
+    def batched(
+        self,
+        n: int = 1,
+        *,
+        policy: Literal["fill"],
+        fillvalue: K,
+    ) -> Chainable[tuple[T | K, ...]]:
+        ...
+
+    # TODO: make Nested
+    @abstractmethod
+    @overload
+    def batched(
+        self,
+        n: int = 1,
+        *,
+        policy: Literal["strict", "ignore"] = "strict",
+    ) -> Chainable[tuple[T, ...]]:
+        ...
+
+    # TODO: make Nested
+    @abstractmethod
+    def batched(
+        self,
+        n: int = 1,
+        *,
+        policy: Literal["fill", "strict", "ignore"] = "ignore",
+        fillvalue: K = None,
+    ) -> Chainable[tuple[T, ...]] | Chainable[tuple[T | K, ...]]:
+        ...
+
+    @abstractmethod
+    def islice(self, start: int | None, stop: int | None, step: int | None = 1) -> Self:
+        ...
+
+    @abstractmethod
+    def skip(self, n: int | None = None) -> Self:
+        ...
+
+    @abstractmethod
+    def getitems(self, indices: Iterable[int]) -> Chainable[T]:
+        ...
+
+    @abstractmethod
+    def starmap(self, func: Callable[P, R], *args: Iterable) -> Chainable[R]:
+        ...
+
+    # TODO: Make Nested
+    @abstractmethod
+    def split_at(self, *indices) -> Chainable[tuple[T, ...]]:
+        ...
+
+    # TODO: Make Nested
+    @abstractmethod
+    def enumerate(self, start: int = 0) -> Chainable[tuple[int, T]]:
+        ...
+
+    @abstractmethod
+    def make_consumable(self) -> Consumable[T]:
+        ...
+
+    @abstractmethod
+    def make_collapsible(self) -> Collapsible[T]:
+        ...
 
 
-@overload
-def sumall(
-    iterable: Sentinel, /, start: A | Literal[0]
-) -> Callable[[ChainableIterator[A]], A]:
-    ...
-
-
-@overload
-def sumall(iterable: ChainableIterator[S]) -> S | Literal[0]:
-    ...
-
-
-def sumall(
-    iterable: ChainableIterator[S] | Sentinel = NA, /, start: A | Literal[0] = 0
-) -> Callable[[ChainableIterator[A]], A] | S | Literal[0]:
-    @wraps(sumall)
-    def wrapper(iterable: ChainableIterator[A]) -> A:
-        return sum(iterable, start=cast(A, start))
-
-    if iterable is NA:
-        return wrapper
-    assert isinstance(iterable, ChainableIterator)
-    return sum(iterable)
-
-
-def mean(iterable: Iterable[int | float]) -> float:
-    total = 0
-    count = 1
-    for count, item in enumerate(iterable, start=1):
-        total += item
-    return total / count
-
-
-class ChainableIterator(Iterator[T]):
+class ChainableIterator(Chainable[T]):
     def __init__(self, iterable: Iterable[T]) -> None:
         self._iterable: Iterator[T] = iter(iterable)
 
@@ -147,7 +294,7 @@ class ChainableIterator(Iterator[T]):
         ChainableIterator(range(5)).append(range(5, 10))
         -> 0 1 2 3 4 5 6 7 8 9
         """
-        self._iterable = chain(self, *iterable)
+        self._iterable = chain(self._iterable, *iterable)
         return self
 
     def prepend(self, *iterable: Iterable[T]) -> Self:
@@ -155,7 +302,7 @@ class ChainableIterator(Iterator[T]):
         ChainableIterator(range(5)).append(range(5, 10))
         -> 5 6 7 8 9 0 1 2 3 4
         """
-        self._iterable = chain(*iterable, self)
+        self._iterable = iter(chain(*iterable, self._iterable))
         return self
 
     def compress(self, selectors: Iterable[bool]) -> Self:
@@ -182,48 +329,6 @@ class ChainableIterator(Iterator[T]):
         self._iterable = takewhile(predicate, self)
         return self
 
-    @overload
-    def zip2(
-        self,
-        iterable: Iterable[R],
-        *,
-        policy: Literal["strict", "shortest"] = "shortest",
-        other_first: Literal[False] = False,
-    ) -> ChainableIterator[tuple[T, R]]:
-        ...
-
-    @overload
-    def zip2(
-        self,
-        iterable: Iterable[R],
-        *,
-        policy: Literal["strict", "shortest"] = "shortest",
-        other_first: Literal[True] = True,
-    ) -> ChainableIterator[tuple[R, T]]:
-        ...
-
-    @overload
-    def zip2(
-        self,
-        iterable: Iterable[R],
-        *,
-        policy: Literal["longest"],
-        fillvalue: K,
-        other_first: Literal[False] = False,
-    ) -> ChainableIterator[tuple[T | K, R | K]]:
-        ...
-
-    @overload
-    def zip2(
-        self,
-        iterable: Iterable[R],
-        *,
-        policy: Literal["longest"],
-        fillvalue: K,
-        other_first: Literal[True] = True,
-    ) -> ChainableIterator[tuple[R | K, T | K]]:
-        ...
-
     def zip2(
         self,
         iterable: Iterable[R],
@@ -231,26 +336,21 @@ class ChainableIterator(Iterator[T]):
         policy: Literal["strict", "shortest", "longest"] = "shortest",
         fillvalue: Optional[K] = None,
         other_first: bool = False,
-    ) -> (
-        ChainableIterator[tuple[T, R]]
-        | ChainableIterator[tuple[R, T]]
-        | ChainableIterator[tuple[R | K, T | K]]
-        | ChainableIterator[tuple[T | K, R | K]]
-    ):
+    ) -> NestedIterator[T | R] | NestedIterator[T | R | K]:
         if policy == "strict":
             if other_first:
-                return ChainableIterator(zip(iterable, self, strict=True))
-            return ChainableIterator(zip(self, iterable, strict=True))
+                return NestedIterator(zip(iterable, self, strict=True))
+            return NestedIterator(zip(self, iterable, strict=True))
         elif policy == "shortest":
             if other_first:
-                return ChainableIterator(zip(iterable, self))
-            return ChainableIterator(zip(self, iterable))
+                return NestedIterator(zip(iterable, self))
+            return NestedIterator(zip(self, iterable))
         elif policy == "longest":
             if other_first:
-                return ChainableIterator(
+                return NestedIterator(
                     zip_longest(iterable, self, fillvalue=cast(K, fillvalue))
                 )
-            return ChainableIterator(
+            return NestedIterator(
                 zip_longest(self, iterable, fillvalue=cast(K, fillvalue))
             )
         raise NotImplementedError(
@@ -263,19 +363,19 @@ class ChainableIterator(Iterator[T]):
         *its: Iterable,
         policy: Literal["strict", "shortest", "longest"] = "shortest",
         fillvalue: Any = None,
-    ) -> ChainableIterator[tuple[Any, ...]]:
+    ) -> NestedIterator[Any]:
         """
         ChainableIterator(range(5)).zip(range(1, 6), range(10, 15))
         -> (0, 1, 10) (1, 2, 11) (2, 3, 12) (3, 4, 13) (4, 5, 14)
         """
         if policy == "longest":
-            return ChainableIterator(
+            return NestedIterator(
                 zip_longest(self, iterable, *its, fillvalue=fillvalue)
             )
         elif policy == "shortest":
-            return ChainableIterator(zip(self, iterable, *its))
+            return NestedIterator(zip(self, iterable, *its))
         elif policy == "strict":
-            return ChainableIterator(zip(self, iterable, *its, strict=True))
+            return NestedIterator(zip(self, iterable, *its, strict=True))
         else:
             raise NotImplementedError()
 
@@ -295,9 +395,7 @@ class ChainableIterator(Iterator[T]):
 
         return ChainableIterator(_helper(filter_false))
 
-    def sliding_window(
-        self, n: int = 2, step: int = 0
-    ) -> ChainableIterator[tuple[T, ...]]:
+    def sliding_window(self, n: int = 2, step: int = 0) -> NestedIterator[T]:
         """
         ChainableIterator(range(5)).sliding_window(2)
         -> (5, 6) (6, 7) (7, 8) (8, 9)
@@ -317,7 +415,7 @@ class ChainableIterator(Iterator[T]):
                 yield tuple(window)
                 self.skip(step)
 
-        return ChainableIterator(_helper())
+        return NestedIterator(_helper())
 
     @overload
     def batched(
@@ -326,7 +424,7 @@ class ChainableIterator(Iterator[T]):
         *,
         policy: Literal["fill"],
         fillvalue: K,
-    ) -> ChainableIterator[tuple[T | K, ...]]:
+    ) -> NestedIterator[T | K]:
         ...
 
     @overload
@@ -335,7 +433,7 @@ class ChainableIterator(Iterator[T]):
         n: int = 1,
         *,
         policy: Literal["strict", "ignore"] = "strict",
-    ) -> ChainableIterator[tuple[T, ...]]:
+    ) -> NestedIterator[T]:
         ...
 
     def batched(
@@ -344,7 +442,7 @@ class ChainableIterator(Iterator[T]):
         *,
         policy: Literal["fill", "strict", "ignore"] = "ignore",
         fillvalue: K = None,
-    ) -> ChainableIterator[tuple[T, ...]] | ChainableIterator[tuple[T | K, ...]]:
+    ) -> NestedIterator[T | K] | NestedIterator[T]:
         """
         ChainableIterator(range(5)).batched(2)
         -> (5, 6) (7, 8) (9,)
@@ -365,7 +463,7 @@ class ChainableIterator(Iterator[T]):
                         raise NotImplementedError()
                 yield batch
 
-        return ChainableIterator(_helper())
+        return NestedIterator(_helper())
 
     def islice(self, start: int | None, stop: int | None, step: int | None = 1) -> Self:
         """
@@ -412,8 +510,7 @@ class ChainableIterator(Iterator[T]):
             )
         return ChainableIterator(starmap(func, self.zip(*args)))
 
-    @no_type_check
-    def split_at(self, *indices) -> ChainableIterator[tuple[T, ...]]:
+    def split_at(self, *indices: int) -> NestedIterator[T]:
         assert len(indices) > 0, "No index provided"
         assert sorted(indices) == list(
             indices
@@ -428,29 +525,76 @@ class ChainableIterator(Iterator[T]):
             .append([islice(self, None)])
             .map(tuple)
         )
-        return iterator
+        return NestedIterator[T](iterator)
 
     def enumerate(self, start: int = 0) -> ChainableIterator[tuple[int, T]]:
         return ChainableIterator(enumerate(self, start=start))
 
-    def transpose(self) -> ChainableIterator[tuple[T, ...]]:
-        its = (iter(item) for item in cast(ChainableIterator[Iterable[T]], self))
-        transposed = zip(*its)
-        return ChainableIterator(transposed)
-
-    def __gt__(self, func: Callable[[ChainableIterator[Any]], R]) -> R:
-        return func(self)
-
-    def consume_with(self, func: Callable[[T], Any]) -> None:
-        r"""For each item, apply the given function.
-
-        NOTE: This collapses the Iterable and Chainable status.
-        """
-        for item in self:
-            func(item)
-
     def feed_to(self, func: Callable[[Any], R]) -> R:
         return func(self)
+
+    def make_consumable(self) -> Consumable:
+        return Consumable(self)
+
+    def make_collapsible(self) -> Collapsible:
+        return Collapsible(self)
+
+
+class NestedIterator(ChainableIterator[Sequence[T]]):
+    def __init__(self, iterable: Iterable[Sequence[T]]) -> None:
+        self._iterable: Iterator[Sequence[T]] = iter(iterable)
+
+    def __iter__(self) -> Iterator[Sequence[T]]:
+        return iter(self._iterable)
+
+    def __next__(self) -> Sequence[T]:
+        val = next(self._iterable)
+        if not isinstance(val, Sequence):
+            raise TypeError("Each item of NestedIterator must be a sequence")
+        return val
+
+    def reverse_each(self) -> Self:
+        self._iterable = (cast(Sequence[T], reversed(item)) for item in self)
+        return self
+
+    def first_of_each(self) -> ChainableIterator[T]:
+        return ChainableIterator((item[0] for item in self))
+
+    def last_of_each(self) -> Chainable[T]:
+        return ChainableIterator((item[-1] for item in self))
+
+    def for_each(self, function: Callable[[Sequence[T]], R]) -> ChainableIterator[R]:
+        return ChainableIterator(map(function, self))
+
+    def transpose(self) -> Self:
+        its = (iter(item) for item in self)
+        transposed = zip(*its)
+        self._iterable = transposed
+        return self
+
+
+class Collapsible(Generic[T]):
+    def __init__(self, iterable: Iterator[T]) -> None:
+        self._iterable = iterable
+
+    def collapse(self, function: Callable[[Iterable[T]], R]) -> R:
+        return function(self._iterable)
+
+    def __rshift__(self, function: Callable[[Iterable[T]], R]) -> R:
+        return function(self._iterable)
+
+
+class Consumable(Generic[T]):
+    def __init__(self, iterable: Iterator[T]) -> None:
+        self._iterable = iterable
+
+    def consume(self, function: Callable[[T], Any]) -> None:
+        for item in self._iterable:
+            function(item)
+
+    # @abstractmethod
+    # def __rshift__(self, func: Callable[[T], Any]) -> None:
+    #     ...
 
 
 if __name__ == "__main__":
@@ -461,20 +605,19 @@ if __name__ == "__main__":
 
     values: Iterator[int] = (randrange(1, 100) for _ in range(ITERATION))
     iter_values = ChainableIterator(values)
-    prob = iter_values.batched(10).map(mean).map(lambda x: x > 1) > partial(
-        sum, start=15
-    )
+    prob = (
+        iter_values.batched(10).map(mean).map(lambda x: x > 1).make_collapsible()
+    ) >> partial(sum, start=15)
     print(prob)
     values = (randrange(1, 100) for _ in range(ITERATION))
     iter_values = ChainableIterator(values)
-    total = iter_values.batched(10).map(mean).map(bool) > sum
+    total = iter_values.batched(10).map(mean).map(bool).make_collapsible() >> sum
     print(total)
     iter_range = ChainableIterator(range(100))
-    for_each(iter_range.islice(20, None, 25), print)
+    iter_range.islice(20, None, 25).make_consumable().consume(print)
     iter_range = ChainableIterator(range(15))
-    for_each(iter_range.split_at(3, 5, 9, 12), print)
-    iter_range = ChainableIterator(range(20))
-    for_each(iter_range.batched(5).transpose(), print)
+    iter_range.split_at(3, 5, 9, 12).make_consumable().consume(print)
+    iter_range.batched(5).transpose().make_consumable().consume(print)
 
     months = [
         "Jan",
