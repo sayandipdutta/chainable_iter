@@ -511,9 +511,7 @@ class ChainableIterator(Chainable[T]):
 
     def starmap(self, func: Callable[P, R], *args: Iterable) -> ChainableIterator[R]:
         if len(args) == 0:
-            return ChainableIterator(
-                starmap(func, cast(ChainableIterator[Iterable[T]], self))
-            )
+            raise ValueError()
         return ChainableIterator(starmap(func, self.zip(*args)))
 
     def split_at(self, *indices: int) -> NestedIterator[T]:
