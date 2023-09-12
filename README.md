@@ -13,18 +13,38 @@ from chainable_iter import ChainableIterator
 
 ch_iter = ChainableIterator(range(10))
 
-result = (
+(
   ch_iter
     .skip(1)
     .map(lambda x: x**2)  # 1 4 9 16 25 36 49 64 81
     .takewhile(lambda x: x < 10)  # 1 4 9
     .getitems([0, 2]) # 1 9
-    .make_collapsible() # it can no longer be used as a ChainableIterator
-    .collapse(sum) # 10
+    .make_consumable() # it can no longer be used as a ChainableIterator
+    .consume(print)
 )
 
-print(result)
-# 10
+# prints
+# 1
+# 9
+
+# ==================================
+# bin string to decimal
+ch_iter = ChainableIterator(("0b101001")[::-1])
+
+def binary_position(power: int, multiplier: int) -> int:
+  return 2 ** power * multiplier
+
+numbers = (
+  ch_iter
+    .takewhile(lambda x: x != "b")  # '1' '0' '0' '1' '0' '1' 
+    .map(int)  # 1 0 0 1 0 1
+    .enumerate()  # (0, 1) (1, 0) (2, 0) (3, 1) (4, 0) (5, 1)
+    .starmap(binary_position)  # 1 0 0 8 0 32
+    .make_collapsible()
+    .collapse(sum)  # 41
+)
+print(numbers)
+# 41
 ```
 
 ## Iterator Types:
@@ -62,7 +82,7 @@ print(result)
 - last_of_each
 - transpose
 
-## Consumer Types:
+## Iterator Consumers:
 This module provides two types, that consume an iterator.
 1. Consumable
   Consumable class has a single method, named collapse, that consumes the iterator
