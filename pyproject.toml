@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chainable_iter"
-version = "0.0.1"
+version = "0.0.2"
 description = "This module provides a convenient way to chain useful methods on an iterator."
 license = {file = "LICENSE"}
 keywords = ["iterator"]
