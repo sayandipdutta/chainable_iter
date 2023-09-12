@@ -551,6 +551,11 @@ class NestedIterator(ChainableIterator[Sequence[T]]):
             raise TypeError("Each item of NestedIterator must be a sequence")
         return val
 
+    def starmap(self, func: Callable[P, R], *args: Iterable) -> ChainableIterator[R]:
+        if len(args) == 0:
+            return ChainableIterator(starmap(func, self._iterable))
+        return ChainableIterator(starmap(func, self.zip(*args)))
+
     def reverse_each(self) -> Self:
         self._iterable = (cast(Sequence[T], reversed(item)) for item in self)
         return self
