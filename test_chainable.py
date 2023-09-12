@@ -1,7 +1,7 @@
 from operator import add
 import pytest
 
-from chainable import ChainableIterator, NestedIterator
+from chainable_iter import ChainableIterator, NestedIterator
 
 
 @pytest.fixture
