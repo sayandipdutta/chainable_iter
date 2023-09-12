@@ -531,8 +531,8 @@ class ChainableIterator(Chainable[T]):
         )
         return NestedIterator[T](iterator)
 
-    def enumerate(self, start: int = 0) -> ChainableIterator[tuple[int, T]]:
-        return ChainableIterator(enumerate(self, start=start))
+    def enumerate(self, start: int = 0) -> NestedIterator[int | T]:
+        return NestedIterator(enumerate(self, start=start))
 
     def make_consumable(self) -> Consumable:
         return Consumable(self)
