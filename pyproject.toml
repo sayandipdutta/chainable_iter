@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chainable_iter"
+version = "0.0.1"
+description = "This module provides a convenient way to chain useful methods on an iterator."
+license = {file = "LICENSE"}
+keywords = ["iterator"]
+authors = [
+  { name="Sayandip Dutta", email="sayandip199309@gmail.com" },
+]
+maintainers = [
+  { name="Sayandip Dutta", email="sayandip199309@gmail.com" },
+]
+requires-python = ">=3.10"
+readme = "README.md"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest >= 7.4"
+]
+
+[project.urls]
+homepage = "https://github.com/sayandipdutta/chainable_iter"
+repository = "https://github.com/sayandipdutta/chainable_iter.git"
+
+[tool.mypy]
+python_version = ">=3.10"
+
+[tool.pyright]
+venvPath = "/home/sayandip199309/.pyenv/versions/"
+venv = "chainable_iter"
+
+
+[tool.pytest.ini_options]
+markers = [
+  "chainable",
+  "nested",
+]
