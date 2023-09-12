@@ -492,7 +492,7 @@ class ChainableIterator(Chainable[T]):
 
     def getitems(self, indices: Iterable[int]) -> ChainableIterator[T]:
         """
-        ChainableIterator(range(10, 20)).take([2, 5])
+        ChainableIterator(range(10, 20)).getitems([2, 5])
         -> 12 15
         """
 
@@ -551,10 +551,27 @@ class NestedIterator(ChainableIterator[Sequence[T]]):
             raise TypeError("Each item of NestedIterator must be a sequence")
         return val
 
+    @overload
     def starmap(self, func: Callable[P, R], *args: Iterable) -> ChainableIterator[R]:
-        if len(args) == 0:
-            return ChainableIterator(starmap(func, self._iterable))
-        return ChainableIterator(starmap(func, self.zip(*args)))
+        ...
+
+    @overload
+    def starmap(
+        self, func: Callable[P, Sequence[R]], *args: Iterable
+    ) -> NestedIterator[R]:
+        ...
+
+    def starmap(
+        self, func: Callable[P, R] | Callable[P, Sequence[R]], *args: Iterable
+    ) -> ChainableIterator[R] | NestedIterator[R]:
+        iterable = self._iterable
+        if len(args) != 0:
+            iterable = self.zip(*args)
+        val = func(*next(iterable))  # type: ignore
+        ch_iter = ChainableIterator(starmap(func, iterable))
+        if isinstance(val, Sequence):
+            return NestedIterator(cast(Iterable[Sequence[R]], ch_iter.prepend([val])))
+        return cast(ChainableIterator[R], ch_iter.prepend([val]))
 
     def reverse_each(self) -> Self:
         self._iterable = (cast(Sequence[T], reversed(item)) for item in self)
