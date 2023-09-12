@@ -274,6 +274,7 @@ class ChainableIterator(Chainable[T]):
         """
         if filter_false:
             self._iterable = filterfalse(func, self)
+            return self
         self._iterable = filter(func, self)
         return self
 
@@ -287,6 +288,7 @@ class ChainableIterator(Chainable[T]):
         if initial is NA:
             self._iterable = accumulate(self, func)
         self._iterable = accumulate(self, func, initial=cast(T, NA))
+            return self
         return self
 
     def append(self, *iterable: Iterable[T]) -> Self:
