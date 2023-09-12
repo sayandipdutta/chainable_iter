@@ -470,9 +470,11 @@ class ChainableIterator(Chainable[T]):
 
         return NestedIterator(_helper())
 
-    def islice(self, start: int | None, stop: int | None, step: int | None = 1) -> Self:
+    def islice(
+        self, *, start: int | None, stop: int | None, step: int | None = 1
+    ) -> Self:
         """
-        ChainableIterator(range(50)).islice(0, 10, 10)
+        ChainableIterator(range(50)).islice(start=0, stop=10, step=10)
         -> 0 10 20 30 40
         """
         if start is None:
@@ -497,7 +499,7 @@ class ChainableIterator(Chainable[T]):
         def _helper() -> Iterator[T]:
             it = iter(indices)
             ix = next(it)
-            for i, item in enumerate(self):
+            for i, item in enumerate(self._iterable):
                 if i == ix:
                     yield item
                     temp = next(it, NA)
@@ -505,8 +507,7 @@ class ChainableIterator(Chainable[T]):
                         break
                     ix = cast(int, temp)
 
-        self._iterable = _helper()
-        return self
+        return ChainableIterator(_helper())
 
     def starmap(self, func: Callable[P, R], *args: Iterable) -> ChainableIterator[R]:
         if len(args) == 0:
