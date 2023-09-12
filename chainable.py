@@ -287,8 +287,8 @@ class ChainableIterator(Chainable[T]):
         """
         if initial is NA:
             self._iterable = accumulate(self, func)
-        self._iterable = accumulate(self, func, initial=cast(T, NA))
             return self
+        self._iterable = accumulate(self, func, initial=cast(T, initial))
         return self
 
     def append(self, *iterable: Iterable[T]) -> Self:
